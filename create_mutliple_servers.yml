@@ -1,0 +1,72 @@
+---
+- name: Create and configure multiple internal servers
+  hosts: localhost
+  become: yes
+
+  vars_files:
+    - server_config.yml
+
+  tasks:
+
+    - name: Generate list of IP addresses
+      set_fact:
+        ip_generator: "{{ range(0, server_config.number_of_servers * 5) | map('int') | map('add', server_config.network.private_ip_start.split('.')[3] | int) | map('string') | map('regex_replace', '^', server_config.network.private_ip_start | regex_replace('(.+\\.)[0-9]+$', '\\1')) | list }}"
+
+    - name: Create server list and find available IPs
+      set_fact:
+        server_list: "{{ server_list | default([]) + [{
+          'name': server_config.base_name ~ '-' ~ item,
+          'private_ip': available_ip[item - 1]
+        }] }}"
+      loop: "{{ range(1, server_config.number_of_servers + 1) | list }}"
+      
+    - name: Find available IP addresses
+      set_fact:
+        available_ip: "{{ available_ip | default([]) + [ item ] }}"
+      loop: "{{ ip_generator }}"
+      until: ip_check.rc != 0
+      retries: 1
+      delay: 1
+      register: ip_check
+      ansible.builtin.command: ping -c 1 {{ item }}
+      ignore_errors: true
+
+    - name: Loop through each server and apply configuration
+      loop: "{{ server_list }}"
+      loop_control:
+        loop_var: server
+
+      tasks:
+
+        - name: Set hostname
+          ansible.builtin.hostname:
+            name: "{{ server.name }}"
+
+        - name: Ensure required packages are installed
+          ansible.builtin.package:
+            name: "{{ item }}"
+            state: present
+          loop: "{{ server_config.packages }}"
+
+        - name: Configure network interface
+          ansible.builtin.template:
+            src: network_template.j2
+            dest: "/etc/netplan/{{ server.name }}_netcfg.yaml"
+            owner: root
+            group: root
+            mode: '0644'
+          notify: 
+            - Apply network configuration
+
+        - name: Ensure storage is mounted
+          ansible.builtin.mount:
+            path: "{{ item.mount_point }}"
+            src: "/dev/{{ item.disk1 }}"
+            fstype: ext4
+            opts: defaults
+            state: mounted
+          loop: "{{ server_config.storage }}"
+
+  handlers:
+    - name: Apply network configuration
+      ansible.builtin.command: netplan apply

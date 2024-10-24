@@ -1,0 +1,22 @@
+server_config:
+  base_name: internal-server
+  number_of_servers: 5
+  os: Ubuntu 22.04
+  cpu: 4
+  memory: 8GB
+  storage:
+    - disk1: 
+        size: 100GB
+        mount_point: /
+    - disk2: 
+        size: 500GB
+        mount_point: /data
+  network:
+    interface: eth0
+    private_ip_start: 10.0.0.5
+    gateway: 10.0.0.1
+    dns: 8.8.8.8
+  packages:
+    - nginx
+    - mysql-server
+    - docker
