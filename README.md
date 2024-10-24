@@ -4,6 +4,6 @@ This will create automatically the numbers of internal server you needed. Just y
 The below files should be in your public server. Then only the internal servers will create.
 # Run Command 
 
-ansible-playbook create_multiple_servers.yml
+**ansible-playbook create_multiple_servers.yml**
 
-After enter this command the servers automatically created.
+After enter this command, servers will automatically created.
